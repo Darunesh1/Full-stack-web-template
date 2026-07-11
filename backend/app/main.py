@@ -63,6 +63,7 @@ async def root():
         "version": app.version,
         "docs_url": "/docs",
         "status": "healthy",
+        "watch_sync": "active",
     }
 if __name__ == "__main__":
     import uvicorn
