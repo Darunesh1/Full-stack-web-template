@@ -171,17 +171,30 @@ const Register = () => {
               </span>
             </div>
             <div style={{ textAlign: "center", marginTop: "0.5rem" }}>
-              <Link
+                <Link
                 to="/login"
                 style={{
-                  color: "#2563eb",
-                  textDecoration: "underline",
-                  fontWeight: "500",
-                  fontSize: "0.9rem",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "12px 28px",
+                    backgroundColor: "#2563eb",
+                    color: "white",
+                    textDecoration: "none",
+                    borderRadius: "8px",
+                    fontWeight: "600",
+                    fontSize: "1rem",
+                    transition: "all 0.2s",
+                    border: "none",
+                    cursor: "pointer",
+                    letterSpacing: "0.5px",
                 }}
-              >
-                Go to Login →
-              </Link>
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1d4ed8")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
+                >
+                <span style={{ fontSize: "1.4rem", lineHeight: 1 }}>⏻</span>
+                LOGIN NOW
+                </Link>
             </div>
           </>
         )}
