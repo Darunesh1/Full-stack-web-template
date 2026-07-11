@@ -1,11 +1,13 @@
 from datetime import datetime
 from typing import Optional
 import uuid
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserBase(BaseModel):
     """Base fields shared across User schemas."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     email: EmailStr
     full_name: Optional[str] = Field(default=None, max_length=255)
@@ -39,7 +41,3 @@ class UserRead(UserBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
-        # from_attributes is Pydantic v2's replacement for standard orm_mode=True

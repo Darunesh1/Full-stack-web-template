@@ -9,15 +9,7 @@ from app.core.database import Base, async_session_maker, engine
 from app.main import app
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Creates a session-scoped event loop for async tests."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 async def init_test_db():
     """Initializes the database schema before running any tests."""
     async with engine.begin() as conn:
