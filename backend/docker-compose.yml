@@ -33,7 +33,7 @@ services:
 
   web:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: template_web
     restart: always
@@ -41,7 +41,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - .:/app
       - /app/.venv
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
@@ -64,13 +64,13 @@ services:
 
   celery_worker:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     container_name: template_celery_worker
     restart: always
     command: celery -A app.core.celery_app worker --loglevel=info
     volumes:
-      - ./backend:/app
+      - .:/app
       - /app/.venv
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
