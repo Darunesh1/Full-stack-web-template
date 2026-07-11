@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Logout from "./pages/Logout";
+import VerifyEmail from "./pages/VerifyEmail";
 
 const PrivateRoute = ({ children }: { children: JSX.Element }) => {
   const { accessToken } = useAuth();
@@ -19,6 +20,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/logout" element={<Logout />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route
             path="/dashboard"
             element={
