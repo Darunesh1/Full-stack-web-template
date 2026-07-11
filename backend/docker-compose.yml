@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: template_db
+    container_name: ${PROJECT_NAME:-template}_db
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -19,7 +19,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: template_redis
+    container_name: ${PROJECT_NAME:-template}_redis
     restart: always
     ports:
       - "6379:6379"
@@ -35,14 +35,30 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: template_web
+    container_name: ${PROJECT_NAME:-template}_web
     restart: always
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
       - /app/.venv
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore:
+            - .venv/
+            - __pycache__/
+            - .pytest_cache/
+            - .git/
+            - .env
+            - Dockerfile
+            - docker-compose.yml
+        - action: rebuild
+          path: pyproject.toml
+        - action: rebuild
+          path: uv.lock
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - POSTGRES_SERVER=db
@@ -66,12 +82,28 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: template_celery_worker
+    container_name: ${PROJECT_NAME:-template}_celery_worker
     restart: always
     command: celery -A app.core.celery_app worker --loglevel=info
     volumes:
-      - .:/app
       - /app/.venv
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore:
+            - .venv/
+            - __pycache__/
+            - .pytest_cache/
+            - .git/
+            - .env
+            - Dockerfile
+            - docker-compose.yml
+        - action: rebuild
+          path: pyproject.toml
+        - action: rebuild
+          path: uv.lock
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - POSTGRES_SERVER=db
