@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.core.database import Base, async_session_maker, engine
-from app.main import app
+from app.main import app as fastapi_app
 from app.core.config import settings
 
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
@@ -47,7 +47,7 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture
 async def client() -> AsyncGenerator[AsyncClient, None]:
     """Yields a test client connected to the FastAPI application."""
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=fastapi_app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
