@@ -7,6 +7,7 @@ const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState(() => {
@@ -184,29 +185,51 @@ const Login = () => {
             >
               Password
             </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.75rem",
-                border: "1px solid " + (isDark ? "#374151" : "#d1d5db"),
-                borderRadius: "8px",
-                backgroundColor: isDark ? "#374151" : "#f9fafb",
-                color: isDark ? "#f9fafb" : "#111827",
-                fontSize: "1rem",
-                outline: "none",
-                transition: "border-color 0.2s",
-                boxSizing: "border-box",
-              }}
-              onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
-              onBlur={(e) =>
-                (e.target.style.borderColor = isDark ? "#374151" : "#d1d5db")
-              }
-              required
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  paddingRight: "3rem",
+                  border: "1px solid " + (isDark ? "#374151" : "#d1d5db"),
+                  borderRadius: "8px",
+                  backgroundColor: isDark ? "#374151" : "#f9fafb",
+                  color: isDark ? "#f9fafb" : "#111827",
+                  fontSize: "1rem",
+                  outline: "none",
+                  transition: "border-color 0.2s",
+                  boxSizing: "border-box",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
+                onBlur={(e) =>
+                  (e.target.style.borderColor = isDark ? "#374151" : "#d1d5db")
+                }
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.2rem",
+                  cursor: "pointer",
+                  color: isDark ? "#9ca3af" : "#6b7280",
+                  padding: "4px",
+                }}
+                aria-label="Toggle password visibility"
+              >
+                {showPassword ? "👁️" : "🔒"}
+              </button>
+            </div>
           </div>
 
           <button

@@ -8,6 +8,8 @@ const Register = () => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -28,6 +30,18 @@ const Register = () => {
     e.preventDefault();
     setError("");
     setSuccess(false);
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
     setLoading(true);
     try {
       await register(fullName, email, password);
@@ -37,6 +51,8 @@ const Register = () => {
       const detail = err?.response?.data?.detail;
       if (Array.isArray(detail)) {
         setError(detail.map((d: any) => d.msg).join(", "));
+      } else if (typeof detail === "string") {
+        setError(detail);
       } else {
         setError(err?.message || "Registration failed");
       }
@@ -227,7 +243,7 @@ const Register = () => {
             />
           </div>
 
-          <div style={{ marginBottom: "1.5rem" }}>
+          <div style={{ marginBottom: "1rem" }}>
             <label
               style={{
                 display: "block",
@@ -239,11 +255,69 @@ const Register = () => {
             >
               Password
             </label>
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.75rem",
+                  paddingRight: "3rem",
+                  border: "1px solid " + (isDark ? "#374151" : "#d1d5db"),
+                  borderRadius: "8px",
+                  backgroundColor: isDark ? "#374151" : "#f9fafb",
+                  color: isDark ? "#f9fafb" : "#111827",
+                  fontSize: "1rem",
+                  outline: "none",
+                  transition: "border-color 0.2s",
+                  boxSizing: "border-box",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
+                onBlur={(e) =>
+                  (e.target.style.borderColor = isDark ? "#374151" : "#d1d5db")
+                }
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: "absolute",
+                  right: "12px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.2rem",
+                  cursor: "pointer",
+                  color: isDark ? "#9ca3af" : "#6b7280",
+                  padding: "4px",
+                }}
+              >
+                {showPassword ? "👁️" : "🔒"}
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "1.5rem" }}>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "0.5rem",
+                fontWeight: "500",
+                color: isDark ? "#e5e7eb" : "#374151",
+                fontSize: "0.9rem",
+              }}
+            >
+              Confirm Password
+            </label>
             <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              type={showPassword ? "text" : "password"}
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               style={{
                 width: "100%",
                 padding: "0.75rem",
@@ -255,35 +329,56 @@ const Register = () => {
                 outline: "none",
                 transition: "border-color 0.2s",
                 boxSizing: "border-box",
+                borderColor: confirmPassword && password !== confirmPassword 
+                  ? "#dc2626" 
+                  : confirmPassword && password === confirmPassword 
+                  ? "#16a34a" 
+                  : isDark ? "#374151" : "#d1d5db",
               }}
               onFocus={(e) => (e.target.style.borderColor = "#2563eb")}
-              onBlur={(e) =>
-                (e.target.style.borderColor = isDark ? "#374151" : "#d1d5db")
-              }
+              onBlur={(e) => {
+                if (confirmPassword && password !== confirmPassword) {
+                  e.target.style.borderColor = "#dc2626";
+                } else if (confirmPassword && password === confirmPassword) {
+                  e.target.style.borderColor = "#16a34a";
+                } else {
+                  e.target.style.borderColor = isDark ? "#374151" : "#d1d5db";
+                }
+              }}
               required
             />
+            {confirmPassword && password !== confirmPassword && (
+              <p style={{ color: "#dc2626", fontSize: "0.8rem", marginTop: "4px" }}>
+                Passwords do not match
+              </p>
+            )}
+            {confirmPassword && password === confirmPassword && (
+              <p style={{ color: "#16a34a", fontSize: "0.8rem", marginTop: "4px" }}>
+                ✓ Passwords match
+              </p>
+            )}
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (confirmPassword !== "" && password !== confirmPassword)}
             style={{
               width: "100%",
               padding: "0.8rem",
-              backgroundColor: loading ? "#34d399" : "#16a34a",
+              backgroundColor:
+                loading || (confirmPassword !== "" && password !== confirmPassword)
+                  ? "#9ca3af"
+                  : "#16a34a",
               color: "white",
               border: "none",
               borderRadius: "8px",
               fontWeight: "600",
               fontSize: "1rem",
-              cursor: loading ? "not-allowed" : "pointer",
+              cursor:
+                loading || (confirmPassword !== "" && password !== confirmPassword)
+                  ? "not-allowed"
+                  : "pointer",
               transition: "background-color 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) e.currentTarget.style.backgroundColor = "#15803d";
-            }}
-            onMouseLeave={(e) => {
-              if (!loading) e.currentTarget.style.backgroundColor = "#16a34a";
             }}
           >
             {loading ? "Creating account..." : "Create Account"}
