@@ -7,6 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
 from app.core.database import Base, async_session_maker, engine
 from app.main import app
+from app.core.config import settings
+
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.pool import NullPool
+import app.core.database
+
+# Override the database engine and session maker with NullPool to prevent connection reuse across pytest loops.
+app.core.database.engine = create_async_engine(
+    settings.async_database_url,
+    poolclass=NullPool,
+    future=True,
+)
+app.core.database.async_session_maker = async_sessionmaker(
+    app.core.database.engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
 
 
 
