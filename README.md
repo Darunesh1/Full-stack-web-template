@@ -15,11 +15,15 @@ The backend is a FastAPI application featuring PostgreSQL (SQLAlchemy async ORM)
 ### How to Run the Application
 
 #### A. Using Docker (Recommended for Containerized Run)
-1. Copy the sample environment file inside the `backend` directory:
+1. Navigate to the backend directory:
    ```bash
-   cp backend/.env.example backend/.env
+   cd backend
    ```
-2. Build and start the services (FastAPI, Celery worker, PostgreSQL, Redis) from the project root:
+2. Copy the sample environment variables file:
+   ```bash
+   cp .env.example .env
+   ```
+3. Build and start the services (FastAPI, Celery worker, PostgreSQL, Redis) using Docker Compose:
    ```bash
    docker-compose up -d --build
    ```
@@ -55,7 +59,7 @@ Tests are built using `pytest`, `pytest-asyncio`, and `httpx`.
 
 - **To run inside Docker**:
   ```bash
-  docker compose exec web pytest
+  cd backend && docker compose exec web pytest
   ```
 - **To run locally**:
   ```bash
