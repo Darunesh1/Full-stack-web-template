@@ -9,15 +9,7 @@ from app.core.database import Base, async_session_maker, engine
 from app.main import app
 
 
-@pytest.fixture(autouse=True)
-async def init_test_db():
-    """Initializes the database schema before running any tests."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    # Optional: Drop all tables after running the session tests to keep it clean
-    # async with engine.begin() as conn:
-    #     await conn.run_sync(Base.metadata.drop_all)
+
 
 
 @pytest.fixture
