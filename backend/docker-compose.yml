@@ -45,12 +45,12 @@ services:
       - /app/.venv
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      - POSTGRES_SERVER=${POSTGRES_SERVER:-db}
+      - POSTGRES_SERVER=db
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-backend_db}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeychangeinproduction123}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
@@ -74,12 +74,12 @@ services:
       - /app/.venv
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      - POSTGRES_SERVER=${POSTGRES_SERVER:-db}
+      - POSTGRES_SERVER=db
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-backend_db}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
-      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_HOST=redis
       - REDIS_PORT=${REDIS_PORT:-6379}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeychangeinproduction123}
       - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
