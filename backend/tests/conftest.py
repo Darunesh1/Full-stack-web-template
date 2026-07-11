@@ -14,31 +14,25 @@ from app.main import app
 
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Yields an AsyncSession wrapped in a rollback transaction for test isolation."""
-    async with engine.connect() as connection:
-        transaction = await connection.begin()
-        async with AsyncSession(
-            bind=connection, expire_on_commit=False
-        ) as session:
-            yield session
-        # Rollback all operations carried out during the test
-        await transaction.rollback()
+    """Yields a fresh AsyncSession and cleans up user records after each test."""
+    async with async_session_maker() as session:
+        yield session
+        # Teardown: delete all users created during the test
+        from sqlalchemy import delete
+        from app.models.user import User
+        try:
+            await session.execute(delete(User))
+            await session.commit()
+        except Exception:
+            await session.rollback()
 
 
 @pytest.fixture
-async def client(
-    db_session: AsyncSession,
-) -> AsyncGenerator[AsyncClient, None]:
-    """Yields a test client with get_db dependency overridden to use the transactional session."""
-
-    async def _override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = _override_get_db
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    """Yields a test client connected to the FastAPI application."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture
