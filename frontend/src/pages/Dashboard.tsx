@@ -1,58 +1,120 @@
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import Navbar from "../components/layout/Navbar";
 
 const Dashboard = () => {
-  const { user, fetchUserProfile, accessToken } = useAuth();
+  const { user } = useAuth();
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem("theme") || "light";
+  });
 
   useEffect(() => {
-    if (accessToken && !user) {
-      fetchUserProfile();
-    }
-  }, [accessToken, user, fetchUserProfile]);
+    const handleThemeChange = () => {
+      const newTheme = localStorage.getItem("theme") || "light";
+      setTheme(newTheme);
+    };
+
+    window.addEventListener("themeChanged", handleThemeChange);
+    window.addEventListener("storage", handleThemeChange);
+
+    return () => {
+      window.removeEventListener("themeChanged", handleThemeChange);
+      window.removeEventListener("storage", handleThemeChange);
+    };
+  }, []);
+
+  const isDark = theme === "dark";
 
   return (
     <>
       <Navbar />
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4 sm:p-6 md:p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 sm:p-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-6">
-              Dashboard
-            </h1>
-            {user ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Full Name</p>
-                  <p className="text-lg font-medium text-gray-800 dark:text-white">{user.full_name}</p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Email</p>
-                  <p className="text-lg font-medium text-gray-800 dark:text-white">{user.email}</p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</p>
-                  <p className="text-lg font-medium text-gray-800 dark:text-white">
-                    {user.is_verified ? "✅ Verified" : "⚠️ Not Verified"}
-                  </p>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider">Member Since</p>
-                  <p className="text-lg font-medium text-gray-800 dark:text-white">
-                    {new Date(user.created_at).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-                <p className="text-gray-500 dark:text-gray-400 mt-4">Loading your profile...</p>
-              </div>
-            )}
+      <div
+        style={{
+          minHeight: "calc(100vh - 73px)",
+          backgroundColor: isDark ? "#111827" : "#f3f4f6",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "2rem",
+          transition: "background-color 0.3s ease",
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: isDark ? "#1f2937" : "#ffffff",
+            padding: "3rem 4rem",
+            borderRadius: "12px",
+            boxShadow: isDark
+              ? "0 4px 20px rgba(0,0,0,0.3)"
+              : "0 4px 20px rgba(0,0,0,0.08)",
+            textAlign: "center",
+            maxWidth: "600px",
+            width: "100%",
+            transition: "all 0.3s ease",
+          }}
+        >
+          <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>🚀</div>
+          <h1
+            style={{
+              fontSize: "1.75rem",
+              fontWeight: "bold",
+              color: isDark ? "#f9fafb" : "#111827",
+              marginBottom: "0.75rem",
+              transition: "color 0.3s ease",
+            }}
+          >
+            Welcome, {user?.full_name || "User"}!
+          </h1>
+          <p
+            style={{
+              color: isDark ? "#9ca3af" : "#6b7280",
+              fontSize: "1rem",
+              lineHeight: "1.6",
+              marginBottom: "1.5rem",
+              transition: "color 0.3s ease",
+            }}
+          >
+            You're all set. You will solve the problem statement here, once it is announced.
+            <br />
+            Stay tuned and keep coding! 💻
+          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: "1rem",
+              justifyContent: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                backgroundColor: isDark ? "#374151" : "#e5e7eb",
+                padding: "0.4rem 1rem",
+                borderRadius: "20px",
+                fontSize: "0.85rem",
+                color: isDark ? "#e5e7eb" : "#374151",
+                transition: "all 0.3s ease",
+              }}
+            >
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+            <span
+              style={{
+                backgroundColor: isDark ? "#1e3a5f" : "#dbeafe",
+                padding: "0.4rem 1rem",
+                borderRadius: "20px",
+                fontSize: "0.85rem",
+                color: isDark ? "#93c5fd" : "#1d4ed8",
+                transition: "all 0.3s ease",
+              }}
+            >
+              Ready to Code 💪
+            </span>
           </div>
         </div>
       </div>
