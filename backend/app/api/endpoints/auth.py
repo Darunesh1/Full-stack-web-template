@@ -94,11 +94,11 @@ async def login(
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
-    refresh_token_in: str = Body(..., embed=True),
+    refresh_token: str = Body(..., embed=True),
     db: AsyncSession = Depends(get_db),
 ) -> Any:
     """Refreshes the access token using a valid refresh token."""
-    payload_dict = decode_token(refresh_token_in)
+    payload_dict = decode_token(refresh_token)
     if not payload_dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

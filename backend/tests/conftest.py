@@ -5,7 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.core.database import Base, async_session_maker, engine
+from app.core.database import Base
 from app.main import app as fastapi_app
 from app.core.config import settings
 
@@ -32,7 +32,7 @@ app.core.database.async_session_maker = async_sessionmaker(
 @pytest.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Yields a fresh AsyncSession and cleans up user records after each test."""
-    async with async_session_maker() as session:
+    async with app.core.database.async_session_maker() as session:
         yield session
         # Teardown: delete all users created during the test
         from sqlalchemy import delete
