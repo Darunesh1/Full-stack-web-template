@@ -28,6 +28,10 @@ async def lifespan(app: FastAPI):
         raise e
     yield
     logger.info("Shutting down FastAPI application...")
+    # Dispose the database engine connection pool
+    from app.core.database import engine
+    await engine.dispose()
+    logger.info("Database connection pool closed successfully.")
 
 
 app = FastAPI(
