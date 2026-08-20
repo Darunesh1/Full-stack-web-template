@@ -241,12 +241,21 @@ Lint and typecheck the frontend with `make lint`, which runs `oxlint` and then `
 in containers:
 
 ```bash
+export ENVIRONMENT=production
 export JWT_SECRET_KEY=$(openssl rand -hex 32)
 make prod
 ```
 
-It refuses to start without a real `JWT_SECRET_KEY`, and the API itself refuses to boot with
-the sample secret when `ENVIRONMENT=production`.
+Two things guard the secret, at different layers:
+
+- The compose file declares `JWT_SECRET_KEY` as **required**, with no fallback. It has to
+  come from the shell or from `backend/.env`, or compose stops before starting anything.
+- The application refuses to boot when `ENVIRONMENT=production` and the key is still the
+  sample value, wherever that value came from.
+
+`backend/.env` is a **development** file — it carries the sample secret and
+`ENVIRONMENT=development`, and if it is present compose will read from it. On a real
+deployment, supply the environment properly and do not ship that file.
 
 ---
 
