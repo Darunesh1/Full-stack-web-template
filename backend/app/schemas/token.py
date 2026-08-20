@@ -10,9 +10,16 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class RefreshRequest(BaseModel):
+    """Payload carrying a refresh token."""
+
+    refresh_token: str
+
+
 class TokenPayload(BaseModel):
     """Schema for validating JWT payload contents."""
 
     sub: Optional[str] = None
     exp: Optional[int] = None
     type: Optional[str] = None
+    jti: Optional[str] = None
