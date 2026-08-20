@@ -1,89 +1,112 @@
-import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tests.conftest import API, auth_headers, register_user, verify_latest_user
 
 
-async def get_auth_headers(client: AsyncClient, email: str, password: str) -> dict:
-    """Helper to perform login and construct authorization headers."""
-    login_data = {"username": email, "password": password}
-    response = await client.post("/auth/login", data=login_data)
-    tokens = response.json()
-    return {"Authorization": f"Bearer {tokens['access_token']}"}
-
-
-@pytest.mark.asyncio
 async def test_get_me_success(client: AsyncClient, mock_emails):
-    # Register, verify, and login user
-    email = "me@example.com"
-    pwd = "password123"
-    await client.post(
-        "/auth/register",
-        json={"email": email, "password": pwd, "full_name": "Me User"},
-    )
-    _, kwargs = mock_emails["verification_emails"][0]
-    await client.get(f"/auth/verify-email?token={kwargs['token']}")
+    await register_user(client, "me@example.com", full_name="Me User")
+    await verify_latest_user(client, mock_emails)
+    headers = await auth_headers(client, "me@example.com")
 
-    headers = await get_auth_headers(client, email, pwd)
-
-    # Get profiles
-    response = await client.get("/users/me", headers=headers)
+    response = await client.get(f"{API}/users/me", headers=headers)
     assert response.status_code == 200
     data = response.json()
-    assert data["email"] == email
+    assert data["email"] == "me@example.com"
     assert data["full_name"] == "Me User"
 
 
-@pytest.mark.asyncio
 async def test_get_me_unauthorized(client: AsyncClient):
-    response = await client.get("/users/me")
+    response = await client.get(f"{API}/users/me")
     assert response.status_code == 401
 
 
-@pytest.mark.asyncio
-async def test_update_me_success(client: AsyncClient, mock_emails):
-    email = "update@example.com"
-    pwd = "password123"
-    await client.post(
-        "/auth/register",
-        json={"email": email, "password": pwd, "full_name": "Original Name"},
+async def test_get_me_rejects_a_refresh_token(client: AsyncClient, mock_emails):
+    await register_user(client, "tokentype@example.com")
+    from tests.conftest import login
+
+    tokens = await login(client, "tokentype@example.com")
+    response = await client.get(
+        f"{API}/users/me",
+        headers={"Authorization": f"Bearer {tokens['refresh_token']}"},
     )
-    _, kwargs = mock_emails["verification_emails"][0]
-    await client.get(f"/auth/verify-email?token={kwargs['token']}")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid token type, access token required"
 
-    headers = await get_auth_headers(client, email, pwd)
 
-    # Update profile name
-    update_payload = {"full_name": "Updated Name"}
-    response = await client.put("/users/me", headers=headers, json=update_payload)
+async def test_update_me_success(client: AsyncClient, mock_emails):
+    await register_user(client, "update@example.com", full_name="Original Name")
+    await verify_latest_user(client, mock_emails)
+    headers = await auth_headers(client, "update@example.com")
+
+    response = await client.patch(
+        f"{API}/users/me", headers=headers, json={"full_name": "Updated Name"}
+    )
     assert response.status_code == 200
     assert response.json()["full_name"] == "Updated Name"
 
 
-@pytest.mark.asyncio
+async def test_update_me_cannot_grant_superuser(client: AsyncClient, mock_emails):
+    """Regression: PATCH /users/me must not accept privilege fields."""
+    await register_user(client, "escalate@example.com")
+    headers = await auth_headers(client, "escalate@example.com")
+
+    response = await client.patch(
+        f"{API}/users/me",
+        headers=headers,
+        json={"is_superuser": True, "is_verified": True, "is_active": True},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["is_superuser"] is False
+    assert body["is_verified"] is False
+
+    # And the flags really did not change server side.
+    me = await client.get(f"{API}/users/me", headers=headers)
+    assert me.json()["is_superuser"] is False
+
+    # The escalated account still cannot reach the admin area.
+    admin = await client.get(f"{API}/admin/users", headers=headers)
+    assert admin.status_code == 403
+
+
+async def test_update_me_email_change_resets_verification(
+    client: AsyncClient, mock_emails
+):
+    await register_user(client, "changing@example.com")
+    await verify_latest_user(client, mock_emails)
+    headers = await auth_headers(client, "changing@example.com")
+    mock_emails["verification_emails"].clear()
+
+    response = await client.patch(
+        f"{API}/users/me", headers=headers, json={"email": "changed@example.com"}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["email"] == "changed@example.com"
+    assert body["is_verified"] is False
+    assert len(mock_emails["verification_emails"]) == 1
+
+
 async def test_update_me_email_conflict(client: AsyncClient, mock_emails):
-    # Register and verify User A
-    email_a = "usera@example.com"
-    pwd = "password123"
-    await client.post(
-        "/auth/register",
-        json={"email": email_a, "password": pwd, "full_name": "User A"},
+    await register_user(client, "usera@example.com", full_name="User A")
+    await register_user(client, "userb@example.com", full_name="User B")
+    headers_b = await auth_headers(client, "userb@example.com")
+
+    response = await client.patch(
+        f"{API}/users/me", headers=headers_b, json={"email": "usera@example.com"}
     )
-    token_a = mock_emails["verification_emails"][0][1]["token"]
-    await client.get(f"/auth/verify-email?token={token_a}")
-
-    # Register and verify User B
-    email_b = "userb@example.com"
-    await client.post(
-        "/auth/register",
-        json={"email": email_b, "password": pwd, "full_name": "User B"},
-    )
-    token_b = mock_emails["verification_emails"][1][1]["token"]
-    await client.get(f"/auth/verify-email?token={token_b}")
-
-    # Log in as User B
-    headers_b = await get_auth_headers(client, email_b, pwd)
-
-    # Try updating User B's email to User A's email (conflict expected)
-    conflict_payload = {"email": email_a}
-    response = await client.put("/users/me", headers=headers_b, json=conflict_payload)
     assert response.status_code == 400
     assert response.json()["detail"] == "A user with this email address already exists."
+
+
+async def test_delete_me(client: AsyncClient, mock_emails):
+    await register_user(client, "goodbye@example.com")
+    headers = await auth_headers(client, "goodbye@example.com")
+
+    response = await client.delete(f"{API}/users/me", headers=headers)
+    assert response.status_code == 200
+
+    # The token is well formed but the account is gone.
+    me = await client.get(f"{API}/users/me", headers=headers)
+    assert me.status_code == 401

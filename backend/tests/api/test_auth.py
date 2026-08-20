@@ -1,156 +1,226 @@
-import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+from tests.conftest import API, auth_headers, login, register_user, verify_latest_user
 
 
-@pytest.mark.asyncio
 async def test_register_user_success(
     client: AsyncClient, db_session: AsyncSession, mock_emails
 ):
-    register_payload = {
-        "email": "newuser@example.com",
-        "password": "strongpassword123",
-        "full_name": "New User",
-    }
-    response = await client.post("/auth/register", json=register_payload)
+    data = await register_user(client, "newuser@example.com", full_name="New User")
 
-    assert response.status_code == 201
-    data = response.json()
     assert data["email"] == "newuser@example.com"
     assert data["full_name"] == "New User"
     assert data["is_active"] is True
     assert data["is_verified"] is False
     assert "id" in data
 
-    # Verify user exists in database
-    query = select(User).where(User.email == "newuser@example.com")
-    result = await db_session.execute(query)
+    result = await db_session.execute(
+        select(User).where(User.email == "newuser@example.com")
+    )
     user = result.scalar_one_or_none()
     assert user is not None
     assert user.is_verified is False
 
-    # Check email background task was triggered
     assert len(mock_emails["verification_emails"]) == 1
-    args, kwargs = mock_emails["verification_emails"][0]
+    _, kwargs = mock_emails["verification_emails"][0]
     assert kwargs["email"] == "newuser@example.com"
     assert "token" in kwargs
 
 
-@pytest.mark.asyncio
-async def test_register_user_duplicate_email(client: AsyncClient):
-    payload = {
-        "email": "duplicate@example.com",
-        "password": "strongpassword123",
-        "full_name": "Test User",
-    }
-    # Register first time
-    response = await client.post("/auth/register", json=payload)
-    assert response.status_code == 201
+async def test_register_rejects_weak_password(client: AsyncClient, mock_emails):
+    response = await client.post(
+        f"{API}/auth/register",
+        json={"email": "weak@example.com", "password": "short1", "full_name": "Weak"},
+    )
+    assert response.status_code == 422
 
-    # Register second time
-    response = await client.post("/auth/register", json=payload)
+    response = await client.post(
+        f"{API}/auth/register",
+        json={"email": "weak@example.com", "password": "alllettersonly", "full_name": "Weak"},
+    )
+    assert response.status_code == 422
+
+
+async def test_register_user_duplicate_email(client: AsyncClient, mock_emails):
+    await register_user(client, "duplicate@example.com")
+
+    response = await client.post(
+        f"{API}/auth/register",
+        json={"email": "duplicate@example.com", "password": "password123"},
+    )
     assert response.status_code == 400
     assert response.json()["detail"] == "A user with this email already exists in the system."
 
 
-@pytest.mark.asyncio
 async def test_verify_email_success(
     client: AsyncClient, db_session: AsyncSession, mock_emails
 ):
-    # 1. Register a user
-    register_payload = {
-        "email": "verify@example.com",
-        "password": "strongpassword123",
-        "full_name": "Verify Me",
-    }
-    await client.post("/auth/register", json=register_payload)
+    await register_user(client, "verify@example.com", full_name="Verify Me")
+    await verify_latest_user(client, mock_emails)
 
-    # 2. Extract verification token from mock emails call
-    assert len(mock_emails["verification_emails"]) == 1
-    _, kwargs = mock_emails["verification_emails"][0]
-    token = kwargs["token"]
-
-    # 3. Hit the verification endpoint
-    response = await client.get(f"/auth/verify-email?token={token}")
-    assert response.status_code == 200
-    assert response.json()["message"] == "Email verified successfully. Welcome onboard!"
-
-    # 4. Check if status updated in DB
-    query = select(User).where(User.email == "verify@example.com")
-    result = await db_session.execute(query)
+    result = await db_session.execute(
+        select(User).where(User.email == "verify@example.com")
+    )
     user = result.scalar_one_or_none()
     assert user is not None
     assert user.is_verified is True
 
-    # 5. Check if welcome email Celery task was scheduled
     assert len(mock_emails["welcome_emails"]) == 1
     _, welcome_kwargs = mock_emails["welcome_emails"][0]
     assert welcome_kwargs["email"] == "verify@example.com"
 
 
-@pytest.mark.asyncio
+async def test_verify_email_rejects_wrong_token_type(client: AsyncClient, mock_emails):
+    await register_user(client, "typemix@example.com")
+    tokens = await login(client, "typemix@example.com")
+
+    # An access token must not be accepted as a verification token.
+    response = await client.post(
+        f"{API}/auth/verify-email", json={"token": tokens["access_token"]}
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid token type"
+
+
+async def test_resend_verification_is_not_an_account_oracle(
+    client: AsyncClient, mock_emails
+):
+    await register_user(client, "resend@example.com")
+    mock_emails["verification_emails"].clear()
+
+    known = await client.post(
+        f"{API}/auth/resend-verification", json={"email": "resend@example.com"}
+    )
+    unknown = await client.post(
+        f"{API}/auth/resend-verification", json={"email": "ghost@example.com"}
+    )
+
+    assert known.status_code == unknown.status_code == 200
+    assert known.json() == unknown.json()
+    # Only the real account actually receives mail.
+    assert len(mock_emails["verification_emails"]) == 1
+
+
 async def test_login_success(client: AsyncClient, mock_emails):
-    # Register and verify
-    payload = {
-        "email": "loginuser@example.com",
-        "password": "mypassword123",
-        "full_name": "Login User",
-    }
-    await client.post("/auth/register", json=payload)
-    _, kwargs = mock_emails["verification_emails"][0]
-    await client.get(f"/auth/verify-email?token={kwargs['token']}")
+    await register_user(client, "loginuser@example.com")
+    await verify_latest_user(client, mock_emails)
 
-    # Perform login
-    login_data = {
-        "username": "loginuser@example.com",
-        "password": "mypassword123",
-    }
-    response = await client.post("/auth/login", data=login_data)
-    assert response.status_code == 200
-    token_response = response.json()
-    assert "access_token" in token_response
-    assert "refresh_token" in token_response
-    assert token_response["token_type"] == "bearer"
+    tokens = await login(client, "loginuser@example.com")
+    assert "access_token" in tokens
+    assert "refresh_token" in tokens
+    assert tokens["token_type"] == "bearer"
 
 
-@pytest.mark.asyncio
 async def test_login_failure(client: AsyncClient):
-    login_data = {
-        "username": "nonexistent@example.com",
-        "password": "wrongpassword",
-    }
-    response = await client.post("/auth/login", data=login_data)
+    response = await client.post(
+        f"{API}/auth/login",
+        data={"username": "nonexistent@example.com", "password": "wrongpassword"},
+    )
     assert response.status_code == 401
     assert response.json()["detail"] == "Incorrect email or password"
 
 
-@pytest.mark.asyncio
-async def test_refresh_token_success(client: AsyncClient, mock_emails):
-    # Register, verify, and log in
-    payload = {
-        "email": "refresh@example.com",
-        "password": "password123",
-        "full_name": "Refresh User",
-    }
-    await client.post("/auth/register", json=payload)
-    _, kwargs = mock_emails["verification_emails"][0]
-    await client.get(f"/auth/verify-email?token={kwargs['token']}")
+async def test_refresh_token_rotates_and_revokes_the_old_token(
+    client: AsyncClient, mock_emails
+):
+    await register_user(client, "refresh@example.com")
+    tokens = await login(client, "refresh@example.com")
 
-    login_res = await client.post(
-        "/auth/login",
-        data={"username": "refresh@example.com", "password": "password123"},
-    )
-    tokens = login_res.json()
-    refresh_token = tokens["refresh_token"]
-
-    # Exchange refresh token
     response = await client.post(
-        "/auth/refresh", json={"refresh_token": refresh_token}
+        f"{API}/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
     )
     assert response.status_code == 200
     new_tokens = response.json()
-    assert "access_token" in new_tokens
-    assert "refresh_token" in new_tokens
+    assert new_tokens["refresh_token"] != tokens["refresh_token"]
+
+    # Replaying the consumed refresh token must fail.
+    replay = await client.post(
+        f"{API}/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert replay.status_code == 401
+    assert replay.json()["detail"] == "Refresh token has been revoked"
+
+
+async def test_refresh_rejects_an_access_token(client: AsyncClient, mock_emails):
+    await register_user(client, "wrongtype@example.com")
+    tokens = await login(client, "wrongtype@example.com")
+
+    response = await client.post(
+        f"{API}/auth/refresh", json={"refresh_token": tokens["access_token"]}
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid token type, refresh token required"
+
+
+async def test_logout_revokes_the_refresh_token(client: AsyncClient, mock_emails):
+    await register_user(client, "logout@example.com")
+    tokens = await login(client, "logout@example.com")
+
+    response = await client.post(
+        f"{API}/auth/logout", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert response.status_code == 200
+
+    replay = await client.post(
+        f"{API}/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert replay.status_code == 401
+
+
+async def test_forgot_password_is_not_an_account_oracle(client: AsyncClient, mock_emails):
+    await register_user(client, "forgot@example.com")
+
+    known = await client.post(
+        f"{API}/auth/forgot-password", json={"email": "forgot@example.com"}
+    )
+    unknown = await client.post(
+        f"{API}/auth/forgot-password", json={"email": "ghost@example.com"}
+    )
+
+    assert known.status_code == unknown.status_code == 200
+    assert known.json() == unknown.json()
+    assert len(mock_emails["reset_emails"]) == 1
+
+
+async def test_password_reset_flow(client: AsyncClient, mock_emails):
+    await register_user(client, "reset@example.com")
+    await client.post(f"{API}/auth/forgot-password", json={"email": "reset@example.com"})
+
+    _, kwargs = mock_emails["reset_emails"][0]
+    response = await client.post(
+        f"{API}/auth/reset-password",
+        json={"token": kwargs["token"], "new_password": "brandnewpass1"},
+    )
+    assert response.status_code == 200
+
+    # The old password no longer works, the new one does.
+    old = await client.post(
+        f"{API}/auth/login",
+        data={"username": "reset@example.com", "password": "password123"},
+    )
+    assert old.status_code == 401
+    await login(client, "reset@example.com", "brandnewpass1")
+
+
+async def test_change_password_requires_the_current_one(client: AsyncClient, mock_emails):
+    await register_user(client, "change@example.com")
+    headers = await auth_headers(client, "change@example.com")
+
+    wrong = await client.post(
+        f"{API}/auth/change-password",
+        headers=headers,
+        json={"current_password": "notitatall1", "new_password": "anotherpass1"},
+    )
+    assert wrong.status_code == 400
+    assert wrong.json()["detail"] == "Current password is incorrect"
+
+    ok = await client.post(
+        f"{API}/auth/change-password",
+        headers=headers,
+        json={"current_password": "password123", "new_password": "anotherpass1"},
+    )
+    assert ok.status_code == 200
+    await login(client, "change@example.com", "anotherpass1")
