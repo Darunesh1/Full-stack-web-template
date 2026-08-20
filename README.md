@@ -66,7 +66,7 @@ make api         run the FastAPI server on :8000
 make worker      run the Celery worker
 make web         run the Vite dev server on :5173
 make test        run the backend test suite
-make lint        typecheck the frontend
+make lint        lint and typecheck the frontend
 make prod        run the whole stack in Docker
 make prod-down   stop the full Docker stack
 ```
@@ -231,7 +231,7 @@ make test ARGS="-k auth"       # a subset
 The suite runs against the real Postgres and Redis containers rather than mocks, so
 `make test` starts them if they are not already up.
 
-Typecheck the frontend with `make lint` (this runs `tsc -b` via the production build).
+Lint and typecheck the frontend with `make lint`, which runs `oxlint` and then `tsc -b`.
 
 ---
 

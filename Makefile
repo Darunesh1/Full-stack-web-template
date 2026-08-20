@@ -78,8 +78,8 @@ web: ## Run the Vite dev server on :5173
 test: up ## Run the backend test suite (make test ARGS="-k auth")
 	cd $(BACKEND) && uv run pytest $(ARGS)
 
-lint: ## Typecheck the frontend
-	cd $(FRONTEND) && npm run build
+lint: ## Lint and typecheck the frontend
+	cd $(FRONTEND) && npm run lint && npm run typecheck
 
 prod: ## Run the whole stack in Docker (requires JWT_SECRET_KEY)
 	$(PROD) up -d --build
