@@ -23,5 +23,6 @@ COPY . .
 # Default port
 EXPOSE 8000
 
-# Default command runs the FastAPI app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Default command runs the FastAPI app.
+# No --reload: this image is for deployment, local development runs natively.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
