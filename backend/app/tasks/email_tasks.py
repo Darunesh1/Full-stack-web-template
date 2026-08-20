@@ -2,11 +2,46 @@ import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Optional
 
 from app.core.celery_app import celery_app
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+BRAND_COLOR = "#4F46E5"
+
+
+def render_email(
+    heading: str,
+    body_html: str,
+    button_label: Optional[str] = None,
+    button_url: Optional[str] = None,
+    accent: str = BRAND_COLOR,
+) -> str:
+    """Wraps message specific content in the shared HTML email chrome."""
+    button = ""
+    if button_label and button_url:
+        button = f"""
+        <p style="margin: 24px 0;">
+          <a href="{button_url}" style="background-color: {accent}; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">{button_label}</a>
+        </p>
+        <p style="font-size: 12px; color: #888;">If the button does not work, paste this link into your browser:<br />{button_url}</p>
+        """
+
+    return f"""
+    <html>
+      <body style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f6f7f9; padding: 24px;">
+        <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; border: 1px solid #e5e7eb;">
+          <h2 style="color: {accent}; margin-top: 0;">{heading}</h2>
+          {body_html}
+          {button}
+          <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+          <p style="font-size: 12px; color: #888;">This is an automated message from {settings.EMAILS_FROM_NAME}.</p>
+        </div>
+      </body>
+    </html>
+    """
 
 
 def send_email(recipient: str, subject: str, html_content: str) -> str:
@@ -54,43 +89,52 @@ def send_email(recipient: str, subject: str, html_content: str) -> str:
 @celery_app.task(name="app.tasks.email_tasks.send_verification_email")
 def send_verification_email(email: str, token: str, full_name: str = "") -> str:
     """Celery task to send email verification links asynchronously."""
-    # Build verification URL (usually pointing to our frontend or relative API link)
-    verification_link = f"http://localhost:8000/auth/verify-email?token={token}"
-    subject = "Verify your email address"
-
-    html_body = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2 style="color: #4F46E5;">Email Verification</h2>
-        <p>Hi {full_name or 'User'},</p>
-        <p>Thank you for signing up! Please verify your email by clicking the link below:</p>
-        <p style="margin: 20px 0;">
-          <a href="{verification_link}" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">Verify Email</a>
-        </p>
-        <p>If you did not request this, you can safely ignore this email.</p>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888;">This is an automated message from {settings.EMAILS_FROM_NAME}.</p>
-      </body>
-    </html>
-    """
-    return send_email(email, subject, html_body)
+    # Links point at the frontend, which calls the API and renders the result.
+    link = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+    html = render_email(
+        heading="Verify your email address",
+        body_html=(
+            f"<p>Hi {full_name or 'there'},</p>"
+            "<p>Thanks for signing up. Confirm your email address to activate your account.</p>"
+            f"<p style='font-size: 13px; color: #666;'>This link expires in {settings.EMAIL_VERIFICATION_EXPIRE_HOURS} hours. "
+            "If you did not create an account, you can safely ignore this email.</p>"
+        ),
+        button_label="Verify email",
+        button_url=link,
+    )
+    return send_email(email, "Verify your email address", html)
 
 
 @celery_app.task(name="app.tasks.email_tasks.send_welcome_email")
 def send_welcome_email(email: str, full_name: str = "") -> str:
     """Celery task to send a welcome email after verification."""
-    subject = f"Welcome to {settings.EMAILS_FROM_NAME}!"
+    html = render_email(
+        heading="Welcome aboard!",
+        body_html=(
+            f"<p>Hi {full_name or 'there'},</p>"
+            "<p>Your email is verified and your account is fully active. "
+            "You can sign in and start exploring.</p>"
+        ),
+        button_label="Sign in",
+        button_url=f"{settings.FRONTEND_URL}/login",
+        accent="#10B981",
+    )
+    return send_email(email, f"Welcome to {settings.EMAILS_FROM_NAME}!", html)
 
-    html_body = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2 style="color: #10B981;">Welcome Aboard!</h2>
-        <p>Hi {full_name or 'User'},</p>
-        <p>Your email has been successfully verified, and your account is now fully active.</p>
-        <p>We're thrilled to have you here. You can now log in and explore all features.</p>
-        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #888;">Thank you, the {settings.EMAILS_FROM_NAME} team.</p>
-      </body>
-    </html>
-    """
-    return send_email(email, subject, html_body)
+
+@celery_app.task(name="app.tasks.email_tasks.send_password_reset_email")
+def send_password_reset_email(email: str, token: str, full_name: str = "") -> str:
+    """Celery task to send a password reset link asynchronously."""
+    link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+    html = render_email(
+        heading="Reset your password",
+        body_html=(
+            f"<p>Hi {full_name or 'there'},</p>"
+            "<p>We received a request to reset your password. Choose a new one using the button below.</p>"
+            f"<p style='font-size: 13px; color: #666;'>This link expires in {settings.PASSWORD_RESET_EXPIRE_MINUTES} minutes. "
+            "If you did not request a reset, no action is needed and your password stays unchanged.</p>"
+        ),
+        button_label="Reset password",
+        button_url=link,
+    )
+    return send_email(email, "Reset your password", html)
