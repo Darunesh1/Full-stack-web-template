@@ -1,5 +1,9 @@
 from typing import Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Placeholder secret shipped in .env.example. Refused in production.
+INSECURE_DEFAULT_SECRET = "supersecretkeychangeinproduction123"
 
 
 class Settings(BaseSettings):
@@ -11,23 +15,34 @@ class Settings(BaseSettings):
     )
 
     ENVIRONMENT: str = "development"
+    API_V1_PREFIX: str = "/api/v1"
+
+    # Public URL of the frontend application. Used to build links inside emails.
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    # Comma separated list of origins allowed to call the API from a browser.
+    BACKEND_CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173"
 
     # PostgreSQL Configuration
-    POSTGRES_SERVER: str = "db"
+    POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "backend_db"
 
     # Redis Configuration
-    REDIS_HOST: str = "redis"
+    REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
 
     # JWT Configuration
-    JWT_SECRET_KEY: str = "supersecretkeychangeinproduction123"
+    JWT_SECRET_KEY: str = INSECURE_DEFAULT_SECRET
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Single use email token lifetimes
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 30
 
     # SMTP Configuration (Optional)
     SMTP_HOST: Optional[str] = None
@@ -36,6 +51,21 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     EMAILS_FROM_EMAIL: Optional[str] = "no-reply@yourdomain.com"
     EMAILS_FROM_NAME: Optional[str] = "FastAPI Template"
+
+    @model_validator(mode="after")
+    def _refuse_default_secret_in_production(self) -> "Settings":
+        """Fail fast rather than let a production deployment run on the sample secret."""
+        if self.ENVIRONMENT == "production" and self.JWT_SECRET_KEY == INSECURE_DEFAULT_SECRET:
+            raise ValueError(
+                "JWT_SECRET_KEY is still set to the insecure default value. "
+                "Generate one with: openssl rand -hex 32"
+            )
+        return self
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parses BACKEND_CORS_ORIGINS into a list of origins."""
+        return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS.split(",") if origin.strip()]
 
     @property
     def async_database_url(self) -> str:

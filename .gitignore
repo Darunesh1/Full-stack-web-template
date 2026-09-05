@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -48,6 +48,15 @@ htmlcov/
 # Local configuration files
 .env
 backend/.env
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.local
+
+# Build output
+frontend/dist/
 
 # OS files
 .DS_Store

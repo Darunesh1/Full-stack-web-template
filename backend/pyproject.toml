@@ -10,7 +10,6 @@ dependencies = [
     "celery>=5.6.3",
     "email-validator>=2.3.0",
     "fastapi>=0.139.0",
-    "passlib[bcrypt]>=1.7.4",
     "pydantic-settings>=2.14.2",
     "pyjwt>=2.13.0",
     "python-multipart>=0.0.32",
@@ -28,4 +27,7 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-asyncio_default_fixture_loop_scope = "function"
+# The suite talks to a real Postgres and a real Redis. Both hold connections
+# bound to the loop that opened them, so every test shares one session loop.
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
