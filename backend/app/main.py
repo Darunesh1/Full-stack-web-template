@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.router import api_router
+from app.api.router import api_router, health_router
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -28,10 +28,12 @@ async def lifespan(app: FastAPI):
         raise e
     yield
     logger.info("Shutting down FastAPI application...")
-    # Dispose the database engine connection pool
     from app.core.database import engine
+    from app.core.redis import close_redis
+
     await engine.dispose()
-    logger.info("Database connection pool closed successfully.")
+    await close_redis()
+    logger.info("Database and cache connections closed successfully.")
 
 
 app = FastAPI(
@@ -41,17 +43,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware configuration
-# In production, specify explicit frontend origins instead of "*"
+# Browser clients must be listed explicitly: a wildcard origin is invalid once
+# credentials are allowed, and browsers reject the combination outright.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include unified API router
+app.include_router(health_router, tags=["Status"])
 app.include_router(api_router)
 
 
@@ -62,9 +64,12 @@ async def root():
         "title": app.title,
         "version": app.version,
         "docs_url": "/docs",
+        "api_prefix": settings.API_V1_PREFIX,
         "status": "healthy",
-        "watch_sync": "active",
     }
+
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
